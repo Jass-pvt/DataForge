@@ -8,7 +8,7 @@ from dateutil.relativedelta import relativedelta
 
 cf.go_offline()
 
-# -------------------- PAGE CONFIG --------------------
+# ---------------- PAGE CONFIG ----------------
 st.set_page_config(
     page_title="📈 DataForge | Stock Analytics",
     layout="wide"
@@ -17,57 +17,65 @@ st.set_page_config(
 st.title("📈 DataForge – Stock Market Analytics")
 st.caption("Built by Jaswanth Rathore (JR)")
 
-# -------------------- SIDEBAR --------------------
+# ---------------- SIDEBAR ----------------
 st.sidebar.header("⚙️ Controls")
 
 ticker = st.sidebar.selectbox(
-    "Select Stock Ticker",
+    "Select Stock",
     ['NVDA', 'INTC', 'AMD', 'TSM', 'MU']
 )
 
 months = st.sidebar.slider(
-    "Historical Data (Months)",
+    "Historical Period (Months)",
     1, 24, 6
 )
 
-# -------------------- DATA LOADER --------------------
+# ---------------- DATA LOADERS ----------------
 @st.cache_data(show_spinner=True)
-def load_stock_data(ticker, months):
-    return yf.download(
+def load_stock(ticker, months):
+    data = yf.download(
         ticker,
         start=date.today() - relativedelta(months=months),
         end=date.today()
     )
+    if isinstance(data.columns, pd.MultiIndex):
+        data.columns = data.columns.get_level_values(0)
+    return data
 
 @st.cache_data(show_spinner=True)
-def load_sector_data(tickers, months):
-    return yf.download(
+def load_sector(tickers, months):
+    data = yf.download(
         tickers,
         start=date.today() - relativedelta(months=months),
         end=date.today()
     )
+    if isinstance(data.columns, pd.MultiIndex):
+        data.columns = data.columns.get_level_values(0)
+    return data
 
-# -------------------- MAIN DATA --------------------
+# ---------------- MAIN STOCK ----------------
 try:
-    stock_data = load_stock_data(ticker, months)
+    stock_data = load_stock(ticker, months)
 
-    st.subheader(f"📌 {ticker} Stock Overview")
+    st.subheader(f"📌 {ticker} Overview")
     st.dataframe(stock_data, use_container_width=True)
 
-    # -------------------- KPIs --------------------
-    latest_price = stock_data['Adj Close'].iloc[-1]
-    returns = stock_data['Adj Close'].pct_change()
-    volatility = returns.std() * np.sqrt(252)
-    total_return = (latest_price / stock_data['Adj Close'].iloc[0] - 1) * 100
+    # ---------------- KPIs ----------------
+    adj_close = stock_data['Adj Close']
+    daily_returns = adj_close.pct_change().dropna()
+
+    latest_price = adj_close.iloc[-1]
+    total_return = (adj_close.iloc[-1] / adj_close.iloc[0] - 1) * 100
+    volatility = daily_returns.std() * np.sqrt(252)
 
     col1, col2, col3 = st.columns(3)
     col1.metric("Latest Price ($)", f"{latest_price:.2f}")
     col2.metric("Total Return (%)", f"{total_return:.2f}")
     col3.metric("Annual Volatility", f"{volatility:.2f}")
 
-    # -------------------- PRICE CHARTS --------------------
+    # ---------------- PRICE GRAPHS ----------------
     st.plotly_chart(
-        stock_data['Adj Close'].iplot(
+        adj_close.iplot(
             asFigure=True,
             title="Adjusted Close Price",
             colors=['green']
@@ -76,29 +84,29 @@ try:
     )
 
     st.plotly_chart(
-        stock_data['Adj Close'].iplot(
+        adj_close.iplot(
             asFigure=True,
             fill=True,
-            title="Price Trend (Area)",
+            title="Price Trend (Area Chart)",
             colors=['green']
         ),
         use_container_width=True
     )
 
-    # -------------------- RETURNS --------------------
+    # ---------------- RETURNS GRAPH ----------------
     st.plotly_chart(
-        returns.iplot(
+        daily_returns.iplot(
             asFigure=True,
-            title="Daily Returns",
-            bestfit=True
+            title="Daily Returns Distribution",
+            kind='hist'
         ),
         use_container_width=True
     )
 
-    # -------------------- QUANT FIG --------------------
+    # ---------------- TECHNICAL ANALYSIS ----------------
     qf = cf.QuantFig(
         stock_data,
-        title="Technical Analysis",
+        title="Technical Indicators",
         legend='top',
         name=ticker
     )
@@ -108,7 +116,7 @@ try:
 
     st.plotly_chart(qf.iplot(asFigure=True), use_container_width=True)
 
-    # -------------------- DOWNLOAD --------------------
+    # ---------------- DOWNLOAD ----------------
     st.download_button(
         "⬇️ Download Stock Data (CSV)",
         stock_data.to_csv().encode("utf-8"),
@@ -117,24 +125,26 @@ try:
     )
 
 except Exception as e:
-    st.error("⚠️ Unable to load stock data. Please try again.")
+    st.error("⚠️ Failed to load stock data. Please try again later.")
 
-# -------------------- PORTFOLIO ANALYSIS --------------------
+# ---------------- PORTFOLIO ANALYSIS ----------------
 st.divider()
-st.subheader("📊 Semiconductor Portfolio Analysis")
+st.subheader("📊 Semiconductor Portfolio Visualization")
 
 semiconductor_tickers = ['NVDA', 'INTC', 'AMD', 'TSM', 'MU']
-sector_data = load_sector_data(semiconductor_tickers, months)
+sector_data = load_sector(semiconductor_tickers, months)
 
-adj_close = sector_data['Adj Close']
-returns = adj_close.pct_change().fillna(0)
+adj_close_sector = sector_data['Adj Close']
+sector_returns = adj_close_sector.pct_change().fillna(0)
 
 weights = np.array([0.1, 0.2, 0.25, 0.25, 0.2])
 
-portfolio_returns = (returns * weights).sum(axis=1)
+portfolio_returns = (sector_returns * weights).sum(axis=1)
 cumulative_returns = (portfolio_returns + 1).cumprod()
 
-# Portfolio chart
+# ---------------- PORTFOLIO GRAPHS ----------------
+
+# 1️⃣ Cumulative returns
 st.plotly_chart(
     cumulative_returns.iplot(
         asFigure=True,
@@ -143,26 +153,51 @@ st.plotly_chart(
     use_container_width=True
 )
 
-# Sharpe Ratio
-sharpe_ratio = (portfolio_returns.mean() / portfolio_returns.std()) * np.sqrt(252)
-st.metric("📈 Portfolio Sharpe Ratio", f"{sharpe_ratio:.2f}")
-
-# -------------------- CORRELATION --------------------
-st.subheader("🔗 Stock Correlation Heatmap")
+# 2️⃣ Portfolio allocation (Pie chart)
+allocation_df = pd.DataFrame({
+    "Stock": semiconductor_tickers,
+    "Weight": weights
+})
 
 st.plotly_chart(
-    returns.corr().iplot(
+    allocation_df.iplot(
+        kind='pie',
+        labels='Stock',
+        values='Weight',
+        title="Portfolio Allocation"
+    ),
+    use_container_width=True
+)
+
+# 3️⃣ Average returns bar chart
+avg_returns = sector_returns.mean() * 252
+
+st.plotly_chart(
+    avg_returns.iplot(
+        kind='bar',
+        title="Annualized Average Returns"
+    ),
+    use_container_width=True
+)
+
+# 4️⃣ Correlation heatmap
+st.plotly_chart(
+    sector_returns.corr().iplot(
         asFigure=True,
         kind='heatmap',
-        title="Correlation Matrix",
+        title="Stock Correlation Heatmap",
         colorscale='RdBu'
     ),
     use_container_width=True
 )
 
-# -------------------- FOOTER --------------------
+# ---------------- FOOTER ----------------
 st.divider()
 st.markdown(
-    "🔗 **GitHub:** https://github.com/Jass-pvt  \n"
-    "🚀 **Live App:** dataforge-jr.streamlit.app"
+    """
+    **DataForge – Financial Analytics Dashboard**  
+    👨‍💻 Built by **Jaswanth Rathore (JR)**  
+    🔗 Live App: https://dataforge-jr.streamlit.app  
+    """
 )
+
