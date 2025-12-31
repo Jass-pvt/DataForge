@@ -33,72 +33,88 @@ months = st.sidebar.slider(
 # ---------------- DATA LOADERS ----------------
 @st.cache_data(show_spinner=True)
 def load_stock(ticker, months):
-    data = yf.download(
+    df = yf.download(
         ticker,
         start=date.today() - relativedelta(months=months),
-        end=date.today()
+        end=date.today(),
+        group_by="column",
+        auto_adjust=False
     )
-    if isinstance(data.columns, pd.MultiIndex):
-        data.columns = data.columns.get_level_values(0)
-    return data
+
+    # Flatten columns if MultiIndex
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+
+    return df
+
 
 @st.cache_data(show_spinner=True)
 def load_sector(tickers, months):
-    data = yf.download(
+    df = yf.download(
         tickers,
         start=date.today() - relativedelta(months=months),
-        end=date.today()
+        end=date.today(),
+        group_by="column",
+        auto_adjust=False
     )
-    if isinstance(data.columns, pd.MultiIndex):
-        data.columns = data.columns.get_level_values(0)
-    return data
+
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+
+    return df
+
 
 # ---------------- MAIN STOCK ----------------
 try:
     stock_data = load_stock(ticker, months)
 
+    # ✅ SAFE price column selection
+    price_col = "Adj Close" if "Adj Close" in stock_data.columns else "Close"
+
     st.subheader(f"📌 {ticker} Overview")
     st.dataframe(stock_data, use_container_width=True)
 
+    prices = stock_data[price_col]
+    returns = prices.pct_change().dropna()
+
     # ---------------- KPIs ----------------
-    adj_close = stock_data['Adj Close']
-    daily_returns = adj_close.pct_change().dropna()
-
-    latest_price = adj_close.iloc[-1]
-    total_return = (adj_close.iloc[-1] / adj_close.iloc[0] - 1) * 100
-    volatility = daily_returns.std() * np.sqrt(252)
-
     col1, col2, col3 = st.columns(3)
-    col1.metric("Latest Price ($)", f"{latest_price:.2f}")
-    col2.metric("Total Return (%)", f"{total_return:.2f}")
-    col3.metric("Annual Volatility", f"{volatility:.2f}")
+    col1.metric("Latest Price ($)", f"{prices.iloc[-1]:.2f}")
+    col2.metric(
+        "Total Return (%)",
+        f"{((prices.iloc[-1] / prices.iloc[0]) - 1) * 100:.2f}"
+    )
+    col3.metric(
+        "Annual Volatility",
+        f"{returns.std() * np.sqrt(252):.2f}"
+    )
 
     # ---------------- PRICE GRAPHS ----------------
     st.plotly_chart(
-        adj_close.iplot(
+        prices.iplot(
             asFigure=True,
-            title="Adjusted Close Price",
-            colors=['green']
+            title=f"{ticker} Price Trend",
+            colors=["green"]
         ),
         use_container_width=True
     )
 
     st.plotly_chart(
-        adj_close.iplot(
+        prices.iplot(
             asFigure=True,
             fill=True,
-            title="Price Trend (Area Chart)",
-            colors=['green']
+            title="Price Area Representation",
+            colors=["green"]
         ),
         use_container_width=True
     )
 
-    # ---------------- RETURNS GRAPH ----------------
+    # ---------------- RETURNS HISTOGRAM ----------------
     st.plotly_chart(
-        daily_returns.iplot(
+        returns.iplot(
             asFigure=True,
-            title="Daily Returns Distribution",
-            kind='hist'
+            kind="hist",
+            title="Daily Returns Distribution"
         ),
         use_container_width=True
     )
@@ -107,44 +123,34 @@ try:
     qf = cf.QuantFig(
         stock_data,
         title="Technical Indicators",
-        legend='top',
+        legend="top",
         name=ticker
     )
-    qf.add_sma([10, 20], width=2)
+    qf.add_sma([10, 20])
     qf.add_bollinger_bands()
     qf.add_volume()
 
     st.plotly_chart(qf.iplot(asFigure=True), use_container_width=True)
 
-    # ---------------- DOWNLOAD ----------------
-    st.download_button(
-        "⬇️ Download Stock Data (CSV)",
-        stock_data.to_csv().encode("utf-8"),
-        file_name=f"{ticker}_data.csv",
-        mime="text/csv"
-    )
-
 except Exception as e:
-    st.error("⚠️ Failed to load stock data. Please try again later.")
+    st.error("⚠️ Unable to load stock data. Please try again.")
 
 # ---------------- PORTFOLIO ANALYSIS ----------------
 st.divider()
 st.subheader("📊 Semiconductor Portfolio Visualization")
 
-semiconductor_tickers = ['NVDA', 'INTC', 'AMD', 'TSM', 'MU']
-sector_data = load_sector(semiconductor_tickers, months)
+sector_data = load_sector(['NVDA', 'INTC', 'AMD', 'TSM', 'MU'], months)
 
-adj_close_sector = sector_data['Adj Close']
-sector_returns = adj_close_sector.pct_change().fillna(0)
+price_col = "Adj Close" if "Adj Close" in sector_data.columns else "Close"
+prices = sector_data[price_col]
+
+returns = prices.pct_change().fillna(0)
 
 weights = np.array([0.1, 0.2, 0.25, 0.25, 0.2])
-
-portfolio_returns = (sector_returns * weights).sum(axis=1)
+portfolio_returns = (returns * weights).sum(axis=1)
 cumulative_returns = (portfolio_returns + 1).cumprod()
 
 # ---------------- PORTFOLIO GRAPHS ----------------
-
-# 1️⃣ Cumulative returns
 st.plotly_chart(
     cumulative_returns.iplot(
         asFigure=True,
@@ -153,40 +159,27 @@ st.plotly_chart(
     use_container_width=True
 )
 
-# 2️⃣ Portfolio allocation (Pie chart)
-allocation_df = pd.DataFrame({
-    "Stock": semiconductor_tickers,
+allocation = pd.DataFrame({
+    "Stock": prices.columns,
     "Weight": weights
 })
 
 st.plotly_chart(
-    allocation_df.iplot(
-        kind='pie',
-        labels='Stock',
-        values='Weight',
+    allocation.iplot(
+        kind="pie",
+        labels="Stock",
+        values="Weight",
         title="Portfolio Allocation"
     ),
     use_container_width=True
 )
 
-# 3️⃣ Average returns bar chart
-avg_returns = sector_returns.mean() * 252
-
 st.plotly_chart(
-    avg_returns.iplot(
-        kind='bar',
-        title="Annualized Average Returns"
-    ),
-    use_container_width=True
-)
-
-# 4️⃣ Correlation heatmap
-st.plotly_chart(
-    sector_returns.corr().iplot(
+    returns.corr().iplot(
         asFigure=True,
-        kind='heatmap',
-        title="Stock Correlation Heatmap",
-        colorscale='RdBu'
+        kind="heatmap",
+        title="Correlation Heatmap",
+        colorscale="RdBu"
     ),
     use_container_width=True
 )
