@@ -17,3 +17,11 @@ It allows users to analyze real-time stock prices, visualize trends, and perform
 | Visualization   | Plotly, Cufflinks          |
 | Deployment      | Streamlit Cloud            |
 | Version Control | GitHub                     |
+
+
+📂 Project Structure
+DataForge/
+│
+├── app.py                # Main Streamlit application
+├── requirements.txt      # Python dependencies
+└── README.md             # Project documentation
