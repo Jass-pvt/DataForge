@@ -5,3 +5,15 @@ It allows users to analyze real-time stock prices, visualize trends, and perform
 
 🚀 Deployed on Streamlit Cloud
 🔗 Live App: https://dataforge-jr.streamlit.app
+
+🛠️ Tech Stack:
+
+| Category        | Tools                      |
+| --------------- | -------------------------- |
+| Frontend        | Streamlit                  |
+| Backend         | Python                     |
+| Data Source     | Yahoo Finance (`yfinance`) |
+| Data Processing | Pandas, NumPy              |
+| Visualization   | Plotly, Cufflinks          |
+| Deployment      | Streamlit Cloud            |
+| Version Control | GitHub                     |
