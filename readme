@@ -11,7 +11,7 @@ It allows users to analyze real-time stock prices, visualize trends, and perform
 | Category        | Tools                      |
 | --------------- | -------------------------- |
 | Frontend        | Streamlit                  | 
-| Backend         | Python                     |
+| Backend         | Python                     | 
 | Data Source     | Yahoo Finance (`yfinance`) |
 | Data Processing | Pandas, NumPy              |
 | Visualization   | Plotly, Cufflinks          |
