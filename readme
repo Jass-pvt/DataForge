@@ -3,7 +3,7 @@
 DataForge is an interactive stock market analytics dashboard built using Streamlit, Python, and Yahoo Finance (yfinance).
 It allows users to analyze real-time stock prices, visualize trends, and perform portfolio-level analysis with dynamic charts.
 
-🚀 Deployed on Streamlit Cloud
+🚀 Deployed on Streamlit Cloud 
 🔗 Live App: https://dataforge-jr.streamlit.app
 
 🛠️ Tech Stack: 
