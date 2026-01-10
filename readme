@@ -25,3 +25,12 @@ DataForge/
 ├── app.py                # Main Streamlit application
 ├── requirements.txt      # Python dependencies
 └── README.md             # Project documentation
+
+
+🚧 Disclaimer
+
+This project is for educational and demonstration purposes only. It does not constitute financial advice. Always consult a certified financial advisor before making investment decisions.
+
+👨‍💻 Author
+
+Jaswanth Rathore (JR)
