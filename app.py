@@ -241,4 +241,4 @@ st.markdown(
     👨‍💻 Built by **Jaswanth Rathore (JR)**  
     🚀 Streamlit Cloud Deployed  
     """
-)
+) 
